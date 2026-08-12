@@ -17,6 +17,14 @@ const childProcessSpies = vi.hoisted(() => ({
 	spawnSync: vi.fn(),
 	originalSpawnSync: undefined as typeof import("node:child_process").spawnSync | undefined,
 }));
+const bootstrapSpies = vi.hoisted(() => ({
+	ensureKernelPython: vi.fn(),
+}));
+vi.mock("../src/core/kernel/bootstrap.js", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../src/core/kernel/bootstrap.js")>();
+	bootstrapSpies.ensureKernelPython.mockImplementation(actual.ensureKernelPython);
+	return { ...actual, ensureKernelPython: bootstrapSpies.ensureKernelPython };
+});
 vi.mock("node:child_process", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("node:child_process")>();
 	childProcessSpies.originalSpawnSync = actual.spawnSync;
@@ -29,6 +37,7 @@ import {
 	admitProjectMcpDeclarations,
 	releaseProjectMcpDeclarationAdmission,
 } from "../src/core/mcp/mcp-project-trust.js";
+import { resolveTrustedProjectSettingsPython } from "../src/core/mcp/project-settings-openat.js";
 import { createMcpProjectTrustAuthority } from "../src/core/mcp/project-trust-authority.js";
 
 const cleanup: string[] = [];
@@ -58,6 +67,21 @@ afterEach(() => {
 });
 
 describe("project settings openat", () => {
+	it("redacts a rejected kernel bootstrap diagnostic", async () => {
+		const diagnostic = "bootstrap secret: /private/kernel-python";
+		bootstrapSpies.ensureKernelPython.mockRejectedValueOnce(new Error(diagnostic));
+
+		let thrown: unknown;
+		try {
+			await resolveTrustedProjectSettingsPython();
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toBeInstanceOf(Error);
+		expect((thrown as Error).message).toBe(unavailable);
+		expect(String(thrown)).not.toContain(diagnostic);
+	});
+
 	it("creates only below its retained root and preserves ordinary settings", async () => {
 		const cwd = root();
 		const grant = admission(cwd);
