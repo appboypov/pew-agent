@@ -85,6 +85,7 @@ export interface LaunchDaemonUpdateRestartCoordinatorOptions {
 	cwd?: string;
 	originActiveSessionId?: string;
 	timeoutMs?: number;
+	onStatus?: (status: DaemonUpdateRestartStatus) => void;
 }
 
 export interface AcquireDaemonUpdateRestartCoordinatorOptions {
@@ -573,6 +574,7 @@ export async function launchDaemonUpdateRestartCoordinator(
 		if (status && status.updatedAt !== observedUpdatedAt) {
 			observedUpdatedAt = status.updatedAt;
 			lastProgressAt = Date.now();
+			options.onStatus?.(status);
 		}
 		if (status && statusLivenessId(status) !== observedLivenessId) {
 			observedLivenessId = statusLivenessId(status);

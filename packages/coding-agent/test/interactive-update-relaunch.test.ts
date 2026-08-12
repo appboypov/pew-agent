@@ -1,8 +1,12 @@
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildDaemonUpdateRestartReport } from "../src/cli/daemon-update-restart.js";
 import {
 	buildUpdateChildArgs,
 	buildUpdateRelaunchArgs,
+	recordInteractiveDaemonRestartStatus,
 	resolveInteractiveUpdateDaemonSocketPath,
 	updateArgsIncludeSelf,
 } from "../src/modes/interactive/interactive-mode.js";
@@ -81,5 +85,27 @@ describe("buildDaemonUpdateRestartReport", () => {
 			"1 daemon session could not be restored.",
 			"Could not restore /tmp/failed.jsonl: create failed",
 		]);
+	});
+	it("returns failure for a failed parent restart phase and appends it to the shared source log", () => {
+		const logPath = join(mkdtempSync(join(tmpdir(), "interactive-update-")), "shared.log");
+		writeFileSync(logPath, "[source update] Promoting the validated source\n");
+		const result = recordInteractiveDaemonRestartStatus(
+			{
+				version: 1,
+				requestId: "request",
+				socketPath: "/tmp/daemon.sock",
+				phase: "failed",
+				coordinator: { pid: process.pid },
+				counts: { total: 0, restored: 0, resumed: 0, failed: 0 },
+				failures: [],
+				message: "restart failed",
+				startedAt: "2026-01-01T00:00:00Z",
+				updatedAt: "2026-01-01T00:00:01Z",
+			},
+			logPath,
+		);
+		expect(result.failed).toBe(true);
+		expect(readFileSync(logPath, "utf8")).toContain("[source update] Promoting the validated source");
+		expect(readFileSync(logPath, "utf8")).toContain("Daemon restart result: failed (restart failed)");
 	});
 });

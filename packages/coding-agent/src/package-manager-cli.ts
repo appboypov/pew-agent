@@ -1,7 +1,7 @@
 import type { ImageContent, TextContent, UserMessage } from "@earendil-works/pi-ai";
 import chalk from "chalk";
 import { spawn } from "child_process";
-import { readFileSync, rmSync, statSync } from "fs";
+import { appendFileSync, readFileSync, rmSync, statSync } from "fs";
 import { resolve, sep } from "path";
 import { selectConfig } from "./cli/config-selector.js";
 import {
@@ -28,6 +28,7 @@ import {
 	launchDaemonUpdateRestartCoordinator,
 	waitForActiveDaemonUpdateRestartCoordinator,
 } from "./cli/daemon-update-restart.js";
+import { detectSourceCheckoutSelfUpdate, runSourceCheckoutSelfUpdate } from "./cli/source-checkout-update.js";
 import {
 	APP_NAME,
 	CONFIG_DIR_NAME,
@@ -1567,27 +1568,12 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 					}
 				}
 				if (updateTargetIncludesSelf(target)) {
-					const selfUpdatePlan = await getSelfUpdatePlan(options.force);
-					if (!selfUpdatePlan.shouldRun) {
+					const sourceCheckout = detectSourceCheckoutSelfUpdate();
+					const selfUpdatePlan = sourceCheckout ? undefined : await getSelfUpdatePlan(options.force);
+					if (selfUpdatePlan && !selfUpdatePlan.shouldRun) {
 						setSelfUpdateNoChangeExitCode();
 						return true;
 					}
-					const selfUpdateCommand = getSelfUpdateCommand(
-						PACKAGE_NAME,
-						selfUpdateNpmCommand,
-						selfUpdatePlan.installSpec,
-						selfUpdatePlan.packageName,
-					);
-					if (!selfUpdateCommand) {
-						printSelfUpdateUnavailable(
-							selfUpdateNpmCommand,
-							selfUpdatePlan.installSpec,
-							selfUpdatePlan.packageName,
-						);
-						process.exitCode = 1;
-						return true;
-					}
-					// Confirm before the install, since upgrading the daemon afterward stops and resumes busy work.
 					const daemonSocketPath = resolveUpdateDaemonSocketPath(options.daemonSocketPath);
 					const daemonProbe = await probeRunningDaemonSessions(daemonSocketPath);
 					if (!(await confirmDaemonSessionLossBeforeUpdate(daemonProbe, options.force))) {
@@ -1597,19 +1583,54 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 						process.exitCode = 1;
 						return true;
 					}
-					try {
-						await runSelfUpdate(selfUpdateCommand);
-					} catch (error: unknown) {
-						const message = error instanceof Error ? error.message : "Unknown package command error";
-						console.error(chalk.red(`Error: ${message}`));
-						printSelfUpdateFallback(selfUpdateCommand);
-						process.exitCode = 1;
-						return true;
+
+					let sourceUpdateLogPath: string | undefined;
+					if (sourceCheckout) {
+						try {
+							const result = await runSourceCheckoutSelfUpdate(sourceCheckout, { force: options.force });
+							sourceUpdateLogPath = result.logPath;
+							if (!result.changed) {
+								setSelfUpdateNoChangeExitCode();
+								return true;
+							}
+						} catch (error: unknown) {
+							const message = error instanceof Error ? error.message : "Unknown source update error";
+							console.error(chalk.red(`Error: ${message}`));
+							process.exitCode = 1;
+							return true;
+						}
+						console.log(chalk.green(`Updated ${APP_NAME} from origin/main`));
+					} else {
+						if (!selfUpdatePlan) throw new Error("Missing package self-update plan");
+						const selfUpdateCommand = getSelfUpdateCommand(
+							PACKAGE_NAME,
+							selfUpdateNpmCommand,
+							selfUpdatePlan.installSpec,
+							selfUpdatePlan.packageName,
+						);
+						if (!selfUpdateCommand) {
+							printSelfUpdateUnavailable(
+								selfUpdateNpmCommand,
+								selfUpdatePlan.installSpec,
+								selfUpdatePlan.packageName,
+							);
+							process.exitCode = 1;
+							return true;
+						}
+						try {
+							await runSelfUpdate(selfUpdateCommand);
+						} catch (error: unknown) {
+							const message = error instanceof Error ? error.message : "Unknown package command error";
+							console.error(chalk.red(`Error: ${message}`));
+							printSelfUpdateFallback(selfUpdateCommand);
+							process.exitCode = 1;
+							return true;
+						}
+						const versionChange = selfUpdatePlan.targetVersion
+							? ` from v${VERSION} to v${selfUpdatePlan.targetVersion}`
+							: "";
+						console.log(chalk.green(`Updated ${APP_NAME}${versionChange}`));
 					}
-					const versionChange = selfUpdatePlan.targetVersion
-						? ` from v${VERSION} to v${selfUpdatePlan.targetVersion}`
-						: "";
-					console.log(chalk.green(`Updated ${APP_NAME}${versionChange}`));
 					if (process.env[SELF_UPDATE_INTERACTIVE_CHILD_ENV] === "1") {
 						return true;
 					}
@@ -1619,14 +1640,21 @@ export async function handlePackageCommand(args: string[]): Promise<boolean> {
 							agentDir,
 							cwd,
 							originActiveSessionId: process.env[DAEMON_WORKER_ACTIVE_SESSION_ID_ENV],
+							onStatus: (progress) => {
+								const message = `[source update] Daemon restart: ${progress.phase}${progress.message ? ` (${progress.message})` : ""}`;
+								console.log(chalk.dim(message));
+								if (sourceUpdateLogPath) appendFileSync(sourceUpdateLogPath, `${message}\n`);
+							},
 						});
 						reportDaemonUpdateRestartStatus(status);
+						if (status.phase === "failed") process.exitCode = 1;
 					} catch (error: unknown) {
 						console.error(
-							chalk.yellow(
-								`Warning: updated, but could not coordinate the daemon restart (${formatUnknownError(error)}).`,
+							chalk.red(
+								`Error: updated, but could not coordinate the daemon restart (${formatUnknownError(error)}).`,
 							),
 						);
+						process.exitCode = 1;
 					}
 				}
 				return true;

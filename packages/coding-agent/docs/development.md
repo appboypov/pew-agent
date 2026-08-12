@@ -20,6 +20,8 @@ Run from source:
 
 The script can be called from any directory and preserves the caller's working directory. Use that behavior to run a source checkout against a separate test project.
 
+A source-launched `prime-agent update` updates that checkout from `origin/main`. The updater requires a clean `main` checkout and a previously built `--dist` bundle carrying the checkout's recorded build ID, stages and validates the merge in a detached temporary worktree, streams and durably logs each fetch, merge, check, and build phase, and restarts the daemon through the normal update coordinator. If the merge conflicts, the validated pre-update bundle is launched in the foreground to resolve only the reported conflicts before validation continues. Package-installed launchers keep using their package manager update path.
+
 ## Product and Source Names
 
 Prime Agent is the product, public CLI, release artifact, and repository name. The monorepo still retains inherited `@earendil-works/pi-*` npm workspace names, a source-package `pi` bin entry, the `pi` package manifest key, and some `PI_*` compatibility environment variables. These names are source and compatibility details, not a signal that contributors should install or develop against pi-mono.

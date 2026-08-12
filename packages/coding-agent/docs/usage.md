@@ -184,7 +184,7 @@ prime-agent update [--force]
 prime-agent config
 ```
 
-See [Prime Agent Packages](packages.md) for package sources and security notes.
+See [Prime Agent Packages](packages.md) for package sources and security notes. When invoked through a repository's `prime-agent.sh`, `prime-agent update` stages `origin/main` in a detached worktree, validates it before promotion, writes a debug log under `.git/pew-update-logs/` (or the interactive session's reported `~/.prime/agent/update-restarts/` path), then uses the normal daemon restart coordinator.
 
 ### Modes
 

@@ -732,6 +732,21 @@ export function buildUpdateRelaunchArgs(args: readonly string[], sessionFile: st
 	return relaunchArgs;
 }
 
+export function recordInteractiveDaemonRestartStatus(
+	status: Awaited<ReturnType<typeof launchDaemonUpdateRestartCoordinator>>,
+	interactiveUpdateLogPath?: string,
+): { failed: boolean; info: string[]; warnings: string[] } {
+	const report = buildDaemonUpdateRestartReport(status);
+	const message = `Daemon restart result: ${status.phase}${status.message ? ` (${status.message})` : ""}`;
+	if (interactiveUpdateLogPath) {
+		fs.appendFileSync(
+			interactiveUpdateLogPath,
+			`${message}\n${report.info.join("\n")}\n${report.warnings.join("\n")}\n`,
+		);
+	}
+	return { failed: status.phase === "failed", ...report };
+}
+
 export function buildUpdateChildArgs(args: readonly string[], daemonSocketPath: string): string[] {
 	return args.includes("--daemon-socket") ? [...args] : [...args, "--daemon-socket", daemonSocketPath];
 }
@@ -8673,7 +8688,17 @@ export class InteractiveMode {
 		await this.ui.terminal.drainInput(1000).catch(() => undefined);
 		this.ui.stop();
 
-		const updateEnv = includesSelf ? { ...process.env, [SELF_UPDATE_INTERACTIVE_CHILD_ENV]: "1" } : process.env;
+		const interactiveUpdateLogPath = includesSelf
+			? path.join(getAgentDir(), "update-restarts", `interactive-${Date.now()}-${randomUUID()}.log`)
+			: undefined;
+		if (interactiveUpdateLogPath) fs.mkdirSync(path.dirname(interactiveUpdateLogPath), { recursive: true });
+		const updateEnv = includesSelf
+			? {
+					...process.env,
+					[SELF_UPDATE_INTERACTIVE_CHILD_ENV]: "1",
+					PRIME_SOURCE_UPDATE_LOG_PATH: interactiveUpdateLogPath,
+				}
+			: process.env;
 		const updateResult = spawnSync(
 			process.execPath,
 			[...process.execArgv, entrypoint, "update", ...updateChildArgs],
@@ -8707,6 +8732,7 @@ export class InteractiveMode {
 			} catch {
 				// The update already completed; do not block relaunch on local teardown.
 			}
+			let restartFailed = false;
 			if (!updateResult.error && updateExitCode === 0) {
 				try {
 					const status = await launchDaemonUpdateRestartCoordinator({
@@ -8714,8 +8740,14 @@ export class InteractiveMode {
 						agentDir: getAgentDir(),
 						cwd: updateCwd,
 						originActiveSessionId: this.connectionState?.activeSessionId,
+						onStatus: (progress) => {
+							const message = `Daemon restart: ${progress.phase}${progress.message ? ` (${progress.message})` : ""}`;
+							console.log(message);
+							if (interactiveUpdateLogPath) fs.appendFileSync(interactiveUpdateLogPath, `${message}\n`);
+						},
 					});
-					const report = buildDaemonUpdateRestartReport(status);
+					const report = recordInteractiveDaemonRestartStatus(status, interactiveUpdateLogPath);
+					restartFailed = report.failed;
 					for (const message of report.info) {
 						console.log(message);
 					}
@@ -8723,8 +8755,9 @@ export class InteractiveMode {
 						console.error(`Warning: ${warning}`);
 					}
 				} catch (error: unknown) {
+					restartFailed = true;
 					console.error(
-						`Warning: updated, but could not coordinate the daemon restart (${error instanceof Error ? error.message : String(error)}).`,
+						`Error: updated, but could not coordinate the daemon restart (${error instanceof Error ? error.message : String(error)}).`,
 					);
 				}
 			}
@@ -8737,7 +8770,7 @@ export class InteractiveMode {
 				console.error(`Failed to relaunch ${APP_NAME}: ${relaunchResult.error.message}`);
 				process.exit(1);
 			}
-			process.exit(relaunchResult.status ?? (relaunchResult.signal ? 1 : 0));
+			process.exit(restartFailed ? 1 : (relaunchResult.status ?? (relaunchResult.signal ? 1 : 0)));
 		}
 
 		this.ui.start();
