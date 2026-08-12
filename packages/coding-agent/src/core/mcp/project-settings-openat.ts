@@ -117,9 +117,9 @@ function unavailable(): never {
 
 /** The managed kernel resolver is host authority and is never called pre-admission. */
 export async function resolveTrustedProjectSettingsPython(): Promise<string> {
-	const python = await ensureKernelPython();
-	if (typeof python !== "string" || !isAbsolute(python)) unavailable();
 	try {
+		const python = await ensureKernelPython();
+		if (typeof python !== "string" || !isAbsolute(python)) unavailable();
 		const resolved = realpathSync.native(python);
 		const target = statSync(resolved);
 		if (!target.isFile() || (target.mode & constants.S_IXUSR) === 0) unavailable();
