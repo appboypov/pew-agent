@@ -97,7 +97,7 @@ describe("source checkout self update", () => {
 		roots.push(root);
 		const entrypoint = join(root, "packages", "coding-agent", "src", "cli.ts");
 		writeFileSync(entrypoint, "");
-		const detected = detectSourceCheckoutSelfUpdate({ PRIME_AGENT_LAUNCHER_PATH: checkout.launcherPath }, entrypoint);
+		const detected = detectSourceCheckoutSelfUpdate({ PEW_AGENT_LAUNCHER_PATH: checkout.launcherPath }, entrypoint);
 		expect(detected).toEqual({
 			repoRoot: realpathSync(root),
 			launcherPath: realpathSync(checkout.launcherPath),
@@ -105,7 +105,7 @@ describe("source checkout self update", () => {
 			oldBundleProvenancePath: join(realpathSync(root), "packages", "coding-agent", "dist", "bundle", "build-id"),
 		});
 		expect(
-			detectSourceCheckoutSelfUpdate({ PRIME_AGENT_LAUNCHER_PATH: checkout.launcherPath }, __filename),
+			detectSourceCheckoutSelfUpdate({ PEW_AGENT_LAUNCHER_PATH: checkout.launcherPath }, __filename),
 		).toBeUndefined();
 	});
 

@@ -5,6 +5,7 @@ import { attachJsonlLineReader, serializeJsonLine } from "../rpc/jsonl.js";
 import {
 	createDaemonCommandEnvelope,
 	DAEMON_COMMAND_ENVELOPE_MIN_PROTOCOL_VERSION,
+	DAEMON_PROTOCOL_NAME,
 	DAEMON_PROTOCOL_VERSION,
 	type DaemonClosingReason,
 	type DaemonCommand,
@@ -429,6 +430,14 @@ export class DaemonClient {
 		}
 
 		if (isDaemonHello(message)) {
+			if (message.protocol.name !== DAEMON_PROTOCOL_NAME) {
+				const error = new Error(
+					`Refusing daemon for ${message.protocol.name}; expected ${DAEMON_PROTOCOL_NAME}. ${daemonEndpointDetails(this.socketPath)}`,
+				);
+				this.rejectAll(error);
+				this.socket?.destroy(error);
+				return;
+			}
 			this.helloMessage = message;
 			for (const waiter of [...this.helloWaiters]) {
 				clearTimeout(waiter.timeout);

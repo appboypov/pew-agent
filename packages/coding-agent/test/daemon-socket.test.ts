@@ -6,11 +6,38 @@ import { basename, dirname, join } from "node:path";
 import lockfile from "proper-lockfile";
 import { describe, expect, it } from "vitest";
 import {
+	APP_NAME,
+	BUILD_ID_ENV,
+	CONFIG_DIR_NAME,
+	ENV_AGENT_DIR,
+	ENV_SESSION_DIR,
+	INTERNAL_ENV_PREFIX,
+	LAUNCHER_PATH_ENV,
+	PACKAGE_NAME,
+	SELF_UPDATE_INTERACTIVE_CHILD_ENV,
+	SOURCE_UPDATE_LOG_PATH_ENV,
+} from "../src/config.js";
+import {
 	cleanupDaemonSocketPath,
 	defaultDaemonSocketPath,
 	getDaemonSocketIdentity,
 	prepareDaemonSocketPath,
 } from "../src/modes/daemon/daemon-socket.js";
+
+describe("Pew runtime identity", () => {
+	it("uses Pew application and storage namespaces without renaming compatibility packages", () => {
+		expect(APP_NAME).toBe("pew-agent");
+		expect(CONFIG_DIR_NAME).toBe(".pew/agent");
+		expect(ENV_AGENT_DIR).toBe("PEW_AGENT_CODING_AGENT_DIR");
+		expect(ENV_SESSION_DIR).toBe("PEW_AGENT_SESSION_DIR");
+		expect(PACKAGE_NAME).toBe("@earendil-works/pi-coding-agent");
+		expect(INTERNAL_ENV_PREFIX).toBe("PEW_AGENT_INTERNAL_");
+		expect(BUILD_ID_ENV).toBe("PEW_AGENT_BUILD_ID");
+		expect(LAUNCHER_PATH_ENV).toBe("PEW_AGENT_LAUNCHER_PATH");
+		expect(SELF_UPDATE_INTERACTIVE_CHILD_ENV).toBe("PEW_AGENT_INTERACTIVE_SELF_UPDATE");
+		expect(SOURCE_UPDATE_LOG_PATH_ENV).toBe("PEW_AGENT_SOURCE_UPDATE_LOG_PATH");
+	});
+});
 
 describe("defaultDaemonSocketPath", () => {
 	it("uses a fixed Windows named pipe path", () => {
@@ -18,7 +45,7 @@ describe("defaultDaemonSocketPath", () => {
 			return;
 		}
 
-		expect(defaultDaemonSocketPath()).toBe("\\\\.\\pipe\\prime-agent-daemon");
+		expect(defaultDaemonSocketPath()).toBe("\\\\.\\pipe\\pew-agent-daemon");
 	});
 
 	it("uses a per-user Unix socket directory", () => {
@@ -29,7 +56,7 @@ describe("defaultDaemonSocketPath", () => {
 		const suffix = typeof process.getuid === "function" ? String(process.getuid()) : "user";
 		const socketPath = defaultDaemonSocketPath();
 
-		expect(dirname(socketPath)).toBe(join(tmpdir(), `prime-agent-${suffix}`));
+		expect(dirname(socketPath)).toBe(join(tmpdir(), `pew-agent-${suffix}`));
 		expect(basename(socketPath)).toBe("daemon.sock");
 	});
 

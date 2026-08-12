@@ -101,7 +101,7 @@ function emitHello(
 		`${JSON.stringify({
 			type: "daemon_hello",
 			socketPath: "/tmp/prime-agent.sock",
-			protocol: { name: "prime-agent.daemon", version },
+			protocol: { name: "pew-agent.daemon", version },
 			schemaRevision,
 			appVersion: "9.9.9",
 			clientId: "client-1",
@@ -187,7 +187,7 @@ describe("DaemonClient", () => {
 		const hello = {
 			type: "daemon_hello",
 			socketPath: "/tmp/prime-agent.sock",
-			protocol: { name: "prime-agent.daemon", version: 1 },
+			protocol: { name: "pew-agent.daemon", version: 1 },
 			appVersion: "9.9.9",
 			clientId: "client-1",
 			serverCapabilities: [],
@@ -359,7 +359,7 @@ describe("DaemonClient", () => {
 		expect(envelope).toMatchObject({
 			type: "command",
 			clientId: expect.any(String),
-			protocol: { name: "prime-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
+			protocol: { name: "pew-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
 			command: { type: "attach", activeSessionId: "active-1" },
 		});
 		expect(envelope.command).not.toHaveProperty("daemonSessionId");
@@ -778,7 +778,7 @@ describe("DaemonClient", () => {
 			`${JSON.stringify({
 				type: "daemon_hello",
 				socketPath: "/tmp/prime-agent.sock",
-				protocol: { name: "prime-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
+				protocol: { name: "pew-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
 				clientId: "server-client-2",
 				serverCapabilities: ["session_input_admission"],
 			})}\n`,
@@ -897,7 +897,7 @@ describe("DaemonClient", () => {
 			`${JSON.stringify({
 				type: "daemon_hello",
 				socketPath: "/tmp/prime-agent.sock",
-				protocol: { name: "prime-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
+				protocol: { name: "pew-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
 				clientId: "server-client-2",
 				serverCapabilities: [],
 			})}\n`,
@@ -913,6 +913,26 @@ describe("DaemonClient", () => {
 		);
 		await expect(response).resolves.toMatchObject({ id: firstEnvelope.id, success: true });
 		client.close();
+	});
+	it("rejects an official Prime Agent handshake even on an explicitly supplied socket", async () => {
+		const client = new DaemonClient("/tmp/prime-agent-501/daemon.sock");
+		const connected = client.connect();
+		const socket = netMock.sockets.at(-1)!;
+		socket.emit("connect");
+		await connected;
+		const hello = client.waitForHello(1000);
+		socket.emit(
+			"data",
+			`${JSON.stringify({
+				type: "daemon_hello",
+				socketPath: "/tmp/prime-agent-501/daemon.sock",
+				protocol: { name: "prime-agent.daemon", version: DAEMON_PROTOCOL_VERSION },
+				clientId: "official-client",
+				serverCapabilities: [],
+			})}\n`,
+		);
+		await expect(hello).rejects.toThrow(/Refusing daemon for prime-agent\.daemon; expected pew-agent\.daemon/);
+		expect(socket.destroyed).toBe(true);
 	});
 });
 

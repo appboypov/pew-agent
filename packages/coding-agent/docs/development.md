@@ -30,12 +30,14 @@ Public releases are currently versioned tarball artifacts installed by the stabl
 
 ## Local Configuration
 
-User configuration lives under `~/.prime/agent/`. Project-local settings, prompts, themes, extensions, skills, and system-prompt files live under `.prime/agent/` in the project root. Override the user config directory with `PRIME_AGENT_CODING_AGENT_DIR` and the session directory with `PRIME_AGENT_SESSION_DIR`.
+This checkout is isolated as `pew-agent`. User configuration and sessions live under `~/.pew/agent/`; project-local settings, prompts, themes, extensions, skills, and system-prompt files live under `.pew/agent/` in the project root. Override the user config directory with `PEW_AGENT_CODING_AGENT_DIR` and the session directory with `PEW_AGENT_SESSION_DIR`.
 
-Use an isolated config directory when manually exercising daemon behavior so development sessions do not collide with normal sessions:
+The default daemon listens at `pew-agent-<uid>/daemon.sock` under the operating system temporary directory, or `pew-agent-daemon` on Windows, and identifies its wire protocol as `pew-agent.daemon`. The app name, config tree, and socket namespace keep source-launched Pew commands from discovering or restarting an official Prime Agent daemon. Existing `~/.prime/agent/` data is not migrated automatically.
+
+Use an additional isolated config directory when manually exercising Pew daemon behavior:
 
 ```bash
-PRIME_AGENT_CODING_AGENT_DIR=/tmp/prime-agent-dev /path/to/prime-agent/prime-agent.sh
+PEW_AGENT_CODING_AGENT_DIR=/tmp/pew-agent-dev /path/to/pew-agent/prime-agent.sh
 ```
 
 ## Daemon Protocol Changes
@@ -54,7 +56,7 @@ Do not resolve packaged assets directly from `__dirname`.
 
 ## Debugging
 
-The hidden `/debug` command writes `~/.prime/agent/prime-agent-debug.log` with rendered TUI lines, their visible widths, and the current agent messages. Daemon, worker, client, and provider diagnostic logs live under `~/.prime/agent/logs/`.
+The hidden `/debug` command writes `~/.pew/agent/pew-agent-debug.log` with rendered TUI lines, their visible widths, and the current agent messages. Daemon, worker, client, and provider diagnostic logs live under `~/.pew/agent/logs/`.
 
 Useful service commands:
 

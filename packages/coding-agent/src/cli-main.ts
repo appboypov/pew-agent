@@ -6,7 +6,7 @@ import {
 	isOwnedSessionWorkerProcess,
 	maybeRunOwnedSessionWorkerFrontend,
 } from "./cli/owned-session-worker.js";
-import { APP_NAME } from "./config.js";
+import { APP_NAME, CODING_AGENT_PROCESS_ENV } from "./config.js";
 
 export async function runCli(): Promise<void> {
 	try {
@@ -16,7 +16,7 @@ export async function runCli(): Promise<void> {
 	}
 
 	process.title = APP_NAME;
-	process.env.PI_CODING_AGENT = "true";
+	process.env[CODING_AGENT_PROCESS_ENV] = "true";
 	process.emitWarning = (() => {}) as typeof process.emitWarning;
 
 	installOwnedSessionWorkerOwnerWatch();

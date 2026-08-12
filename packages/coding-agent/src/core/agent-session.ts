@@ -1,3 +1,4 @@
+import { APP_NAME, ENV_AGENT_DIR } from "../config.js";
 /**
  * AgentSession - Core abstraction for agent lifecycle and session management.
  *
@@ -8918,7 +8919,7 @@ export class AgentSession {
 
 	private _addWebsearchKeyEnv(env: Record<string, string>): void {
 		if (this._agentDir) {
-			env.PRIME_AGENT_CODING_AGENT_DIR = this._agentDir;
+			env[ENV_AGENT_DIR] = this._agentDir;
 		}
 
 		if (process.env[SERPER_ENV_VAR]?.trim()) {
@@ -8976,7 +8977,7 @@ export class AgentSession {
 	}
 
 	private _createEphemeralRlmSessionDir(): string {
-		this._rlmSessionDir = mkdtempSync(join(tmpdir(), "prime-agent-rlm-"));
+		this._rlmSessionDir = mkdtempSync(join(tmpdir(), `${APP_NAME}-rlm-`));
 		return this._rlmSessionDir;
 	}
 

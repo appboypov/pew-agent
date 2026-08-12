@@ -360,7 +360,7 @@ const STARTUP_SESSION_LOSS_COPY: DaemonSessionLossCopy = {
 	unlistableDetail:
 		"A background service from a different Prime Agent version is running and its sessions could not be listed. Stopping it may terminate active sessions.",
 	question: "Stop it and continue?",
-	nonTtyHint: 'Run "prime-agent shutdown" to stop it, then retry.',
+	nonTtyHint: `Run "${APP_NAME} shutdown" to stop it, then retry.`,
 };
 
 // The promise to keep after awaiting readiness. Wrapped in an object so it
@@ -382,7 +382,7 @@ async function takeOverStaleDaemonOrExit(socketPath: string): Promise<DaemonRead
 	}
 	if (!(await shutdownDaemonAndWait(socketPath))) {
 		console.error(
-			chalk.red(`Could not stop the background service on ${socketPath}. Run "prime-agent shutdown" and retry.`),
+			chalk.red(`Could not stop the background service on ${socketPath}. Run "${APP_NAME} shutdown" and retry.`),
 		);
 		process.exit(1);
 	}

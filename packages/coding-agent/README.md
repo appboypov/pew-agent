@@ -15,6 +15,8 @@
 
 Prime Agent began as a hard fork of [pi-mono](https://github.com/badlogic/pi-mono), but it is now developed and distributed independently. This workspace retains inherited `@earendil-works/pi-*` source package identifiers, the `pi` package manifest key, and a source-package `pi` bin entry for internal compatibility. Public releases are currently versioned tarball artifacts installed by the scripts below; release packaging rewrites the application package and command to `prime-agent`. Do not use the inherited npm package as the Prime Agent install path.
 
+This checkout runs locally as Pew: the `pew` wrapper has application identity `pew-agent`, reads and writes `~/.pew/agent/`, and owns only the `pew-agent-<uid>/daemon.sock` namespace (`pew-agent-daemon` on Windows). It intentionally does not reuse official Prime Agent settings, sessions, or daemons. Existing data under `~/.prime/agent/` remains in place and is not migrated automatically.
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Changed the Pew source runtime to use its own `pew-agent` application, config, session, environment, subprocess, temporary-file, socket, and daemon wire identities so official Prime Agent sessions remain untouched.
 - Added safe in-place self-updates for source-launched checkouts, including clean-tree guards, detached validation, durable foreground logs, interactive conflict resolution, rebuilds, and coordinated daemon restart.
 - Fixed URLs not opening on click in fullscreen mode on terminals such as Ghostty; clicking a link in the transcript, dock, or overlays now opens it in the browser.
 

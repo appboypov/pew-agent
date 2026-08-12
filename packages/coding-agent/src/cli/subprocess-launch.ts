@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { isBunBinary } from "../config.js";
+import { isBunBinary, LAUNCHER_PATH_ENV } from "../config.js";
 
 export interface CliSubprocessLaunchSpec {
 	command: string;
@@ -36,7 +36,7 @@ function quoteCommandArgument(value: string): string {
 }
 
 export function formatCurrentCliCommand(args: readonly string[], environment: NodeJS.ProcessEnv = process.env): string {
-	const launcherPath = environment.PRIME_AGENT_LAUNCHER_PATH;
+	const launcherPath = environment[LAUNCHER_PATH_ENV];
 	if (launcherPath) {
 		return [launcherPath, ...args].map(quoteCommandArgument).join(" ");
 	}

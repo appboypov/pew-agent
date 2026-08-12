@@ -15,6 +15,7 @@ import {
 	sortDaemons,
 	verifyHelloSupervisorPid,
 } from "../src/cli/daemon-ps.js";
+import { APP_NAME } from "../src/config.js";
 import { getProcessStartId } from "../src/core/session-lease.js";
 import { defaultDaemonSocketDir } from "../src/modes/daemon/daemon-socket.js";
 
@@ -50,8 +51,14 @@ describe("parseSsListeners", () => {
 		expect(daemons.some((daemon) => daemon.pid === 4321)).toBe(false);
 	});
 
-	it("honors a different app name", () => {
-		expect(parseSsListeners(stdout, "pi")).toEqual([]);
+	it("keeps Pew discovery isolated from official Prime Agent listeners", () => {
+		expect(APP_NAME).toBe("pew-agent");
+		expect(parseSsListeners(stdout, APP_NAME)).toEqual([]);
+		const pewListener =
+			'u_str LISTEN 0 511 /tmp/pew-agent-1000/daemon.sock 1 * 0 users:(("pew-agent",pid=9012,fd=24))';
+		expect(parseSsListeners(pewListener, APP_NAME)).toEqual([
+			{ pid: 9012, socketPath: "/tmp/pew-agent-1000/daemon.sock" },
+		]);
 	});
 });
 
@@ -183,7 +190,7 @@ describe("planReap", () => {
 		const daemon = makeDaemon({ socketPath: "/tmp/hung.sock", status: "unreachable", pid: 7 });
 		const skipped = planReap([daemon], false)[0]!;
 		expect(skipped.kind).toBe("skip");
-		expect(skipped.kind === "skip" ? skipped.reason : "").toContain("prime-agent shutdown --force");
+		expect(skipped.kind === "skip" ? skipped.reason : "").toContain(`${APP_NAME} shutdown --force`);
 		expect(planReap([daemon], true)[0]!.kind).toBe("kill");
 	});
 

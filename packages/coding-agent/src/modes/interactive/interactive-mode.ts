@@ -63,6 +63,7 @@ import {
 	getShareViewerUrl,
 	SELF_UPDATE_INTERACTIVE_CHILD_ENV,
 	SELF_UPDATE_NOT_ATTEMPTED_EXIT_CODE,
+	SOURCE_UPDATE_LOG_PATH_ENV,
 	VERSION,
 } from "../../config.js";
 import { AGENT_MESSAGE_RECEIVED_PREVIEW_LABEL, isAgentSessionMessage } from "../../core/agent-messages.js";
@@ -8696,7 +8697,7 @@ export class InteractiveMode {
 			? {
 					...process.env,
 					[SELF_UPDATE_INTERACTIVE_CHILD_ENV]: "1",
-					PRIME_SOURCE_UPDATE_LOG_PATH: interactiveUpdateLogPath,
+					[SOURCE_UPDATE_LOG_PATH_ENV]: interactiveUpdateLogPath,
 				}
 			: process.env;
 		const updateResult = spawnSync(

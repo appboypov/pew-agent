@@ -4,8 +4,8 @@
 	"description": "Coding agent CLI with IPython-backed tools and session management",
 	"type": "module",
 	"piConfig": {
-		"name": "prime-agent",
-		"configDir": ".prime/agent"
+		"name": "pew-agent",
+		"configDir": ".pew/agent"
 	},
 	"bin": {
 		"pi": "dist/bundle/cli.js"

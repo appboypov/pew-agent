@@ -17,6 +17,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import lockfile from "proper-lockfile";
+import { LAUNCHER_PATH_ENV, SOURCE_UPDATE_LOG_PATH_ENV } from "../config.js";
 
 export interface SourceCheckoutSelfUpdate {
 	repoRoot: string;
@@ -51,7 +52,7 @@ export function detectSourceCheckoutSelfUpdate(
 	environment: NodeJS.ProcessEnv = process.env,
 	entrypoint = process.argv[1],
 ): SourceCheckoutSelfUpdate | undefined {
-	const configuredLauncher = environment.PRIME_AGENT_LAUNCHER_PATH;
+	const configuredLauncher = environment[LAUNCHER_PATH_ENV];
 	if (!configuredLauncher || !entrypoint) return undefined;
 	let launcherPath: string;
 	let resolvedEntrypoint: string;
@@ -155,7 +156,7 @@ function lockfileDigest(root: string): string | undefined {
 }
 
 function createLogPath(repoRoot: string): string {
-	const requested = process.env.PRIME_SOURCE_UPDATE_LOG_PATH;
+	const requested = process.env[SOURCE_UPDATE_LOG_PATH_ENV];
 	if (requested) {
 		mkdirSync(dirname(requested), { recursive: true });
 		return requested;

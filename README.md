@@ -35,6 +35,9 @@ Prime Agent is an open-source coding and research agent for general and long-run
 
 Prime Agent combines a persistent Python control environment with durable harness state, so useful working context and reusable operating patterns can outlive a single chat window.
 
+> [!NOTE]
+> This source checkout is the Pew runtime. The local `pew` wrapper launches it with application identity `pew-agent`, stores configuration and sessions under `~/.pew/agent/`, and uses its own `pew-agent-<uid>/daemon.sock` namespace (`pew-agent-daemon` on Windows). It does not discover, attach to, restart, or stop daemons from an official `prime-agent` installation. Existing Prime Agent credentials, settings, packages, and sessions are not migrated automatically; copy only the files you intentionally want Pew to share. Published package names remain unchanged for dependency compatibility.
+
 - **Everything is programmatic:** persistent IPython is the built-in model tool; file operations, shell commands, tool use, subagents, and context management happen through code.
 - **Subagents are built in:** `rlm(...)` spawns real child agents for parallel or background work and returns their results programmatically.
 - **The harness can improve:** `/refine` reviews the current trajectory and can apply small, evidence-backed updates to supplemental harness state. It never rewrites the immutable base system prompt, and recorded snapshots support rollback.

@@ -12,6 +12,7 @@ import { createServer, type Server, type Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
+import { APP_NAME } from "../../config.js";
 import { FORK_SERVER_SCRIPT } from "./fork-server-script.js";
 
 const READY_TIMEOUT_MS = 30_000;
@@ -123,7 +124,7 @@ class ForkServer {
 	}
 
 	private start(): Promise<void> {
-		this.socketDir = mkdtempSync(join(tmpdir(), "prime-agent-forkserver-"));
+		this.socketDir = mkdtempSync(join(tmpdir(), `${APP_NAME}-forkserver-`));
 		const socketPath = join(this.socketDir, "control.sock");
 
 		return new Promise<void>((resolve, reject) => {

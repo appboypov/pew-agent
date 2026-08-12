@@ -34,7 +34,6 @@ export const isBunBinary =
 /** Detect if Bun is the runtime (compiled binary or bun run) */
 export const isBunRuntime = !!process.versions.bun;
 
-export const SELF_UPDATE_INTERACTIVE_CHILD_ENV = "PRIME_AGENT_INTERACTIVE_SELF_UPDATE";
 export const SELF_UPDATE_NOT_ATTEMPTED_EXIT_CODE = 75;
 
 // =============================================================================
@@ -496,7 +495,7 @@ interface PackageJson {
 const pkg = JSON.parse(readFileSync(getPackageJsonPath(), "utf-8")) as PackageJson;
 
 const piConfigName: string | undefined = pkg.piConfig?.name;
-const envPrefix =
+export const ENV_PREFIX =
 	(piConfigName || "pi")
 		.toUpperCase()
 		.replace(/[^A-Z0-9]+/g, "_")
@@ -508,9 +507,16 @@ export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".prime/agent"
 export const VERSION: string = pkg.version || "0.0.0";
 
 // e.g., PI_CODING_AGENT_DIR or PRIME_AGENT_CODING_AGENT_DIR
-export const ENV_AGENT_DIR = `${envPrefix}_CODING_AGENT_DIR`;
-export const ENV_SESSION_DIR = `${envPrefix}_SESSION_DIR`;
-export const ENV_LEGACY_SESSION_DIR = `${envPrefix}_CODING_AGENT_SESSION_DIR`;
+export const ENV_AGENT_DIR = `${ENV_PREFIX}_CODING_AGENT_DIR`;
+export const ENV_SESSION_DIR = `${ENV_PREFIX}_SESSION_DIR`;
+export const ENV_LEGACY_SESSION_DIR = `${ENV_PREFIX}_CODING_AGENT_SESSION_DIR`;
+export const INTERNAL_ENV_PREFIX = `${ENV_PREFIX}_INTERNAL_`;
+export const LEGACY_INTERNAL_ENV_PREFIX = "PRIME_AGENT_INTERNAL_";
+export const SELF_UPDATE_INTERACTIVE_CHILD_ENV = `${ENV_PREFIX}_INTERACTIVE_SELF_UPDATE`;
+export const BUILD_ID_ENV = `${ENV_PREFIX}_BUILD_ID`;
+export const LAUNCHER_PATH_ENV = `${ENV_PREFIX}_LAUNCHER_PATH`;
+export const SOURCE_UPDATE_LOG_PATH_ENV = `${ENV_PREFIX}_SOURCE_UPDATE_LOG_PATH`;
+export const CODING_AGENT_PROCESS_ENV = `${ENV_PREFIX}_CODING_AGENT`;
 
 export function expandTildePath(path: string): string {
 	if (path === "~") return homedir();

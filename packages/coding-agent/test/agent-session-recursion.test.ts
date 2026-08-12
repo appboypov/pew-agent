@@ -14,6 +14,7 @@ import {
 } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ENV_AGENT_DIR } from "../src/config.js";
 import {
 	type AgentSessionMessageController,
 	createAgentSessionMessage,
@@ -3346,20 +3347,20 @@ describe("AgentSession RLM session dir", () => {
 		const agentDir = join(tempDir, "custom-agent-dir");
 		const root = createSession(SessionManager.inMemory(tempDir), agentDir);
 		const env = (root as unknown as InspectableRlmDirSession)._rlmKernelEnv();
-		expect(env.PRIME_AGENT_CODING_AGENT_DIR).toBe(agentDir);
+		expect(env[ENV_AGENT_DIR]).toBe(agentDir);
 	});
 
 	it("omits the agentDir env var when none is configured", () => {
 		const root = createSession(SessionManager.inMemory(tempDir));
 		const env = (root as unknown as InspectableRlmDirSession)._rlmKernelEnv();
-		expect(env.PRIME_AGENT_CODING_AGENT_DIR).toBeUndefined();
+		expect(env[ENV_AGENT_DIR]).toBeUndefined();
 	});
 
 	it("exports agentDir but skips key injection when no websearch skill is loaded", () => {
 		const agentDir = join(tempDir, "custom-agent-dir");
 		const root = createSession(SessionManager.inMemory(tempDir), agentDir, "stored-key", false);
 		const env = (root as unknown as InspectableRlmDirSession)._rlmKernelEnv();
-		expect(env.PRIME_AGENT_CODING_AGENT_DIR).toBe(agentDir);
+		expect(env[ENV_AGENT_DIR]).toBe(agentDir);
 		expect(env.SERPER_API_KEY).toBeUndefined();
 	});
 

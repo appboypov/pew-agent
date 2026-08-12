@@ -8,6 +8,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { registerSessionResourceCleanup } from "@earendil-works/pi-ai";
 import { v4 as uuid } from "uuid";
 import { Dealer, Subscriber } from "zeromq";
+import { APP_NAME } from "../../config.js";
 import { ensureKernelPython, type KernelBootstrapProgressHandler, type KernelPythonSkill } from "./bootstrap.js";
 import { ForkServerUnavailable, forkKernel, isForkServerEnabled } from "./fork-server.js";
 import {
@@ -461,7 +462,7 @@ function makeConnection(): { info: ConnectionInfo; path: string; tempDir: string
 		key: randomBytes(16).toString("hex"),
 		kernel_name: "python3",
 	};
-	const tempDir = mkdtempSync(join(tmpdir(), "prime-agent-kernel-"));
+	const tempDir = mkdtempSync(join(tmpdir(), `${APP_NAME}-kernel-`));
 	const path = join(tempDir, "connection.json");
 	writeFileSync(path, JSON.stringify(info, null, 2), { mode: 0o600 });
 	return { info, path, tempDir };
