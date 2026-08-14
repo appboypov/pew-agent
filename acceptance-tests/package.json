@@ -1,5 +1,5 @@
 {
-  "name": "prime-agent-acceptance-tests",
+  "name": "pew-agent-acceptance-tests",
   "private": true,
   "type": "module",
   "scripts": {

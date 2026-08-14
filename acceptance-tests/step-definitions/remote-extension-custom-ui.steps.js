@@ -1,7 +1,7 @@
 import { Given, Then, When } from "@cucumber/cucumber";
 
 const givens = [
-  "an interactive Prime client supports remote extension custom UI",
+  "an interactive Pew Agent client supports remote extension custom UI",
   "an unmodified Pi extension is loaded in the daemon worker",
   "a remote custom component is displayed",
   "the daemon does not advertise remote extension custom UI",
@@ -24,11 +24,11 @@ const whens = [
 for (const text of whens) When(text, function () {});
 
 const thens = [
-  "the Prime client displays the component rendered by that extension",
+  "the Pew Agent client displays the component rendered by that extension",
   "the extension receives its ordinary completion result",
   "the extension component receives the input and current rendering width",
-  "the Prime client displays each requested redraw",
-  "the component is removed from the Prime client",
+  "the Pew Agent client displays each requested redraw",
+  "the component is removed from the Pew Agent client",
   "the extension call settles without leaving a pending UI request",
   "ordinary agent interaction remains available",
   "the client does not send unsupported custom UI commands",
