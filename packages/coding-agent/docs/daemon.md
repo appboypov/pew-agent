@@ -94,6 +94,14 @@ Protocol v1 is retained only for the one-release update handoff that prepares an
 
 JSON and RPC client modes do not expose daemon greetings, envelopes, snapshot records, lifecycle events, or connection metadata.
 
+## Remote Extension Custom UI
+
+Interactive clients advertise the optional `extension_custom_ui` capability. When it is available, an extension's ordinary `ctx.ui.custom()` call remains worker-owned: the worker constructs the component, runs its callbacks and terminal-input listeners, and resolves the extension's original completion value. The daemon sends only rendered lines and presentation metadata to one capable attached client; that owner returns raw input, terminal dimensions, resize notifications, cancellation, and hidden-overlay terminal input.
+
+Custom UI events are routed only to the selected owner, not to read-only observers. If the owner disconnects, the supervisor cancels the worker-side component and disposes it. Custom UI frames bypass transcript snapshot catch-up because they represent ephemeral component state rather than durable session history.
+
+The capability is optional for mixed-version compatibility. With an older or non-interactive client, `ctx.ui.custom()` returns `undefined`, preserving the existing fallback path. Direct RPC mode remains unchanged and continues to expose its documented dialog sub-protocol rather than the daemon custom-component transport.
+
 ## Reconnect, Replay, and Snapshots
 
 Every sequenced event belongs to a worker generation. Clients retain the last `{ generation, sequence }` cursor and present it on attach. The server reports whether the requested interval is complete, partial, or unavailable.

@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { INTERNAL_ENV_PREFIX } from "../src/config.js";
 import { getProcessStartId } from "../src/core/session-lease.js";
 import type { DaemonSocketClient } from "../src/modes/daemon/active-session-state.js";
 import { CommandRecoveryJournal } from "../src/modes/daemon/command-recovery-journal.js";
@@ -114,7 +115,7 @@ vi.mock("../src/core/session-lease.js", async (importOriginal) => {
 	};
 });
 
-const supervisorRegistryDirEnv = "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR";
+const supervisorRegistryDirEnv = `${INTERNAL_ENV_PREFIX}DAEMON_SUPERVISOR_REGISTRY_DIR`;
 const previousSupervisorRegistryDir = process.env[supervisorRegistryDirEnv];
 const supervisorRegistryDirs = new Set<string>();
 

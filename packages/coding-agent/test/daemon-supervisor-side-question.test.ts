@@ -181,4 +181,73 @@ describe("daemon supervisor side-question routing", () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	it("routes a custom component only to its selected owner and cancels it on owner detach", async () => {
+		const owner = {
+			id: "owner",
+			attachedActiveSessionIds: new Set(["active-custom"]),
+			capabilities: new Set(["extension_custom_ui"]),
+			catchupActiveSessionIds: new Set<string>(),
+			catchupPurposes: new Map(),
+			detachInput: () => {},
+		} as unknown as DaemonSocketClient;
+		const observer = {
+			id: "observer",
+			attachedActiveSessionIds: new Set(["active-custom"]),
+			capabilities: new Set(["extension_custom_ui"]),
+			catchupActiveSessionIds: new Set<string>(),
+			catchupPurposes: new Map(),
+			detachInput: () => {},
+		} as unknown as DaemonSocketClient;
+		const forwarded: DaemonCommand[] = [];
+		const worker = {
+			client: {},
+			transcriptCaches: new Map(),
+		} as never;
+		const writeSerialized = vi.fn(() => true);
+		const supervisor = Object.assign(Object.create(DaemonSupervisor.prototype), {
+			clients: new Set([owner, observer]),
+			extensionCustomUiOwners: new Map(),
+			streamReconstructor: { observe: vi.fn() },
+			invalidateWorkerSnapshot: vi.fn(),
+			writeSerialized,
+			matchWorkers: vi.fn(() => [{ worker, summary: { id: "active-custom", activeSessionId: "active-custom" } }]),
+			forwardToWorker: vi.fn(async (_worker, command) => {
+				forwarded.push(command);
+				return { id: "response", type: "response", command: command.type, success: true };
+			}),
+			write: vi.fn(),
+			syncWorkerExtensionUi: vi.fn(async () => undefined),
+			log: vi.fn(),
+		});
+		const open = {
+			type: "extension_custom_ui_open",
+			activeSessionId: "active-custom",
+			id: "custom-1",
+			presentation: { overlay: true },
+		};
+		Reflect.apply(Reflect.get(supervisor, "handleWorkerFrame"), supervisor, [
+			worker,
+			{
+				header: {
+					kind: "outbound",
+					outboundType: open.type,
+					activeSessionId: open.activeSessionId,
+				},
+				payload: Buffer.from(JSON.stringify(open)),
+			},
+		]);
+
+		expect(writeSerialized).toHaveBeenCalledTimes(1);
+		expect(writeSerialized).toHaveBeenCalledWith(owner, expect.any(Buffer));
+
+		Reflect.apply(Reflect.get(supervisor, "detachClient"), supervisor, [owner, "active-custom"]);
+		await vi.waitFor(() => expect(forwarded).toHaveLength(1));
+		expect(forwarded[0]).toMatchObject({
+			type: "extension_custom_ui_event",
+			activeSessionId: "active-custom",
+			requestId: "custom-1",
+			event: { type: "cancel" },
+		});
+	});
 });

@@ -2349,6 +2349,8 @@ The callback receives:
 
 See [tui.md](tui.md) for the full component API.
 
+In a daemon-backed interactive session, custom components remain in the worker that loaded the extension. A capable terminal client renders worker-supplied frames and returns raw input and terminal dimensions, so the extension keeps its ordinary factory, callbacks, overlay handle, and `done(value)` result. This transport is capability-negotiated: if no attached client advertises `extension_custom_ui`, `custom()` returns `undefined` and the extension may use its existing fallback. Headless RPC mode does not advertise this capability; its dialog sub-protocol and documented `custom()` limitation remain unchanged.
+
 #### Overlay Mode (Experimental)
 
 Pass `{ overlay: true }` to render the component as a floating modal on top of existing content, without clearing the screen:

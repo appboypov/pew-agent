@@ -49,6 +49,8 @@ import type {
 	AgentConnectionEvent,
 	AgentConnectionEventListener,
 	AgentConnectionExecuteBashOptions,
+	AgentConnectionExtensionCustomUiEvent,
+	AgentConnectionExtensionCustomUiInputResult,
 	AgentConnectionExtensionUiResponse,
 	AgentConnectionForkOptions,
 	AgentConnectionHeartbeat,
@@ -305,7 +307,7 @@ export class DaemonAgentConnection implements AgentConnection {
 			capabilities: [
 				"attach_snapshot",
 				"event_sequence",
-				...(supportsExtensionUi ? (["extension_ui"] as const) : []),
+				...(supportsExtensionUi ? (["extension_ui", "extension_custom_ui"] as const) : []),
 				"slim_attach",
 				"chunked_snapshot",
 				...(this.options.ownedSession ? (["client_owned_sessions"] as const) : []),
@@ -752,6 +754,28 @@ export class DaemonAgentConnection implements AgentConnection {
 		});
 	}
 
+	async sendExtensionCustomUiEvent(
+		requestId: string,
+		event: AgentConnectionExtensionCustomUiEvent,
+	): Promise<AgentConnectionExtensionCustomUiInputResult | undefined> {
+		if (!this.client.supportsServerCapability("extension_custom_ui")) return undefined;
+		if (event.type === "terminal_input") {
+			return this.requestData<AgentConnectionExtensionCustomUiInputResult | undefined>({
+				type: "extension_custom_ui_event",
+				activeSessionId: this.activeSessionId,
+				requestId,
+				event,
+			});
+		}
+		await this.requestOk({
+			type: "extension_custom_ui_event",
+			activeSessionId: this.activeSessionId,
+			requestId,
+			event,
+		});
+		return undefined;
+	}
+
 	async prompt(message: string, options?: AgentConnectionPromptOptions): Promise<void> {
 		await this.promptWithAdmissionCancellation("prompt", message, options);
 	}
@@ -1156,7 +1180,7 @@ export class DaemonAgentConnection implements AgentConnection {
 				capabilities: [
 					"attach_snapshot",
 					"event_sequence",
-					...(supportsExtensionUi ? (["extension_ui"] as const) : []),
+					...(supportsExtensionUi ? (["extension_ui", "extension_custom_ui"] as const) : []),
 					"slim_attach",
 					"chunked_snapshot",
 					...(this.options.ownedSession ? (["client_owned_sessions"] as const) : []),
@@ -1553,6 +1577,29 @@ export class DaemonAgentConnection implements AgentConnection {
 					payload: message.payload,
 				},
 			});
+			return;
+		}
+		if (message.type === "extension_custom_ui_open") {
+			await this.emit({
+				type: "extension_custom_ui_open",
+				id: message.id,
+				presentation: message.presentation,
+			});
+			return;
+		}
+		if (message.type === "extension_custom_ui_frame") {
+			await this.emit({
+				type: "extension_custom_ui_frame",
+				id: message.id,
+				lines: message.lines,
+				hidden: message.hidden,
+				focused: message.focused,
+				presentation: message.presentation,
+			});
+			return;
+		}
+		if (message.type === "extension_custom_ui_close") {
+			await this.emit({ type: "extension_custom_ui_close", id: message.id, error: message.error });
 			return;
 		}
 		if (message.type === "extension_error") {

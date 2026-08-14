@@ -44,6 +44,16 @@ describe("daemon protocol helpers", () => {
 		expect(DAEMON_SCHEMA_ID).toBe(`protocol-${DAEMON_PROTOCOL_VERSION}-schema-${DAEMON_SCHEMA_REVISION}-${digest}`);
 	});
 
+	it("capability-gates remote extension custom UI for mixed-version peers", () => {
+		expect(DAEMON_DEFAULT_SERVER_CAPABILITIES).toContain("extension_custom_ui");
+		expect(DAEMON_COMMAND_COMPATIBILITY.extension_custom_ui_event).toMatchObject({
+			minProtocol: 7,
+			minSchemaRevision: 17,
+			capability: "extension_custom_ui",
+		});
+		expect(DAEMON_OUTBOUND_COMPATIBILITY.extension_custom_ui_open.capability).toBe("extension_custom_ui");
+	});
+
 	it("requires compatibility metadata for the heartbeat protocol surface", () => {
 		expect(DAEMON_PROTOCOL_VERSION).toBe(7);
 		expect(DAEMON_SCHEMA_ID).toContain(`protocol-${DAEMON_PROTOCOL_VERSION}`);

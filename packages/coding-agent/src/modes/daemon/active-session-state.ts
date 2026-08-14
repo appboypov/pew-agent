@@ -38,6 +38,7 @@ export interface ActiveSessionState {
 	/** Attach snapshots in flight: reserved for passivation busyness, but not yet event recipients. */
 	pendingAttaches: number;
 	extensionUiRequests: Map<string, ActiveSessionExtensionUiRequest>;
+	extensionCustomUiRequests?: Map<string, ActiveSessionExtensionCustomUiRequest>;
 	eventGeneration: string;
 	lastEventSequence: DaemonEventSequence;
 	unsubscribe?: () => void;
@@ -55,6 +56,14 @@ export interface ActiveSessionState {
 
 export interface ActiveSessionExtensionUiRequest {
 	resolve: (response: DaemonExtensionUIResponse) => void;
+}
+
+export interface ActiveSessionExtensionCustomUiRequest {
+	ownerClientId: string;
+	handleEvent: (
+		event: import("../agent-connection/types.js").AgentConnectionExtensionCustomUiEvent,
+	) => import("../agent-connection/types.js").AgentConnectionExtensionCustomUiInputResult | undefined;
+	cancel: () => void;
 }
 
 interface ActiveSessionIdIndex {

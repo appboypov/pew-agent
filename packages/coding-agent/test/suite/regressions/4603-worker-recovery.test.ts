@@ -13,7 +13,7 @@ import {
 import { createConnection, type Socket } from "node:net";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { APP_NAME, ENV_AGENT_DIR } from "../../../src/config.js";
+import { APP_NAME, ENV_AGENT_DIR, INTERNAL_ENV_PREFIX } from "../../../src/config.js";
 import { getProcessStartId } from "../../../src/core/session-lease.js";
 import { DaemonAgentConnection } from "../../../src/modes/agent-connection/daemon-agent-connection.js";
 import { DaemonClient } from "../../../src/modes/daemon/daemon-client.js";
@@ -95,7 +95,7 @@ const fauxExtensionPath = resolve(__dirname, "../../fixtures/eng-4600-faux-exten
 const cliPath = resolve(__dirname, "../../../src/cli.ts");
 const tsxPath = resolve(__dirname, "../../../../../node_modules/tsx/dist/cli.mjs");
 const tsconfigPath = resolve(__dirname, "../../../../../tsconfig.json");
-const supervisorRegistryDirEnv = "PRIME_AGENT_INTERNAL_DAEMON_SUPERVISOR_REGISTRY_DIR";
+const supervisorRegistryDirEnv = `${INTERNAL_ENV_PREFIX}DAEMON_SUPERVISOR_REGISTRY_DIR`;
 const handles = new Set<ProcessHandle>();
 const harnesses: Harness[] = [];
 const socketTempDirs = new Set<string>();
@@ -237,6 +237,9 @@ function registerFixtureProcess(
 	if (!Number.isSafeInteger(pid) || pid <= 0) {
 		throw new Error(`Invalid fixture process pid: ${String(pid)}`);
 	}
+	if (pid === process.pid) {
+		throw new Error("Refusing to register the Vitest worker as a disposable fixture process");
+	}
 	if (!processStartId) {
 		if (fixturePidIsAlive(pid)) {
 			throw new Error(`Live fixture process ${pid} has no exact start identity`);
@@ -264,6 +267,9 @@ function registerFixtureOwnedProcesses(): void {
 			const ownerPath = join(registryDir, name, "owner.json");
 			const owner = readFixtureJson<unknown>(ownerPath);
 			if (owner === undefined) continue;
+			if (typeof owner === "object" && owner !== null && (owner as { pid?: unknown }).pid === process.pid) {
+				continue;
+			}
 			registerFixtureRecord(owner, "supervisor", ownerPath);
 		}
 	}
@@ -342,6 +348,9 @@ function isFixtureDescendant(pid: number, rootPid: number, processes: Map<number
 }
 
 function signalFixtureProcess(identity: FixtureProcessIdentity, signal: NodeJS.Signals): boolean {
+	if (identity.pid === process.pid) {
+		throw new Error("Refusing to signal the Vitest worker during fixture cleanup");
+	}
 	const state = fixtureProcessState(identity);
 	if (state === "exited") return false;
 	if (state === "unverified") {
@@ -867,11 +876,12 @@ describe("ENG-4603 worker recovery convergence", () => {
 				),
 			),
 		);
-		expect(
-			decodeResponse(
-				await frames.waitFor((frame) => frame.header.kind === "outbound" && frame.header.requestId === authId),
-			).success,
-		).toBe(true);
+		const authResponse = decodeResponse(
+			await frames.waitFor((frame) => frame.header.kind === "outbound" && frame.header.requestId === authId),
+		);
+		if (!authResponse.success) {
+			throw new Error(`Worker authentication failed: ${authResponse.error ?? "unknown error"}`);
+		}
 		if (process.platform === "darwin") {
 			const countAfterAuthentication = readFileSync(psCountPath, "utf8").length;
 			await delay(750);

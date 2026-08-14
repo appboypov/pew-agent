@@ -33,6 +33,8 @@ import type {
 	AgentConnectionEvent,
 	AgentConnectionEventListener,
 	AgentConnectionExecuteBashOptions,
+	AgentConnectionExtensionCustomUiEvent,
+	AgentConnectionExtensionCustomUiInputResult,
 	AgentConnectionExtensionUiResponse,
 	AgentConnectionForkOptions,
 	AgentConnectionHeartbeat,
@@ -292,6 +294,14 @@ export class InProcessAgentConnection implements AgentConnection {
 
 	async respondToExtensionUiRequest(_requestId: string, _response: AgentConnectionExtensionUiResponse): Promise<void> {
 		// In-process extension UI requests are handled directly by InteractiveMode.
+	}
+
+	async sendExtensionCustomUiEvent(
+		_requestId: string,
+		_event: AgentConnectionExtensionCustomUiEvent,
+	): Promise<AgentConnectionExtensionCustomUiInputResult | undefined> {
+		// In-process custom UI is rendered directly by InteractiveMode.
+		return undefined;
 	}
 
 	async prompt(message: string, options?: AgentConnectionPromptOptions): Promise<void> {

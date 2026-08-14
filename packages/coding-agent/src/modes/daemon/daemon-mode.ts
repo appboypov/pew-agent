@@ -328,6 +328,7 @@ const DAEMON_COMMAND_TYPES: ReadonlySet<string> = new Set([
 	"get_tool_definition",
 	"set_session_entry_label",
 	"extension_ui_response",
+	"extension_custom_ui_event",
 	"prepare_update_restart",
 	"retry_worker",
 	"restart",
@@ -1213,6 +1214,7 @@ export class AgentDaemon {
 			clients: new Set(),
 			pendingAttaches: 0,
 			extensionUiRequests: new Map(),
+			extensionCustomUiRequests: new Map(),
 			eventGeneration: createActiveSessionId(),
 			lastEventSequence: 0,
 			clientEnv,
@@ -4533,6 +4535,19 @@ export class AgentDaemon {
 				return success(command.id, "extension_ui_response");
 			}
 
+			case "extension_custom_ui_event": {
+				const state = this.getSessionState(command.activeSessionId);
+				const pending = state.extensionCustomUiRequests?.get(command.requestId);
+				if (!pending) {
+					throw new Error(`Unknown extension custom UI request: ${command.requestId}`);
+				}
+				if (pending.ownerClientId !== client.id) {
+					throw new Error(`Client does not own extension custom UI request: ${command.requestId}`);
+				}
+				const result = pending.handleEvent(command.event);
+				return success(command.id, "extension_custom_ui_event", result);
+			}
+
 			case "prepare_update_restart":
 				this.log(
 					`prepare_update_restart command received over socket; ${this.sessions.size} active session(s) will be closed`,
@@ -6161,6 +6176,14 @@ export class AgentDaemon {
 				this.write(client, sequencedMessage);
 				continue;
 			}
+			if (
+				sequencedMessage.type === "extension_custom_ui_open" ||
+				sequencedMessage.type === "extension_custom_ui_frame" ||
+				sequencedMessage.type === "extension_custom_ui_close"
+			) {
+				this.write(client, sequencedMessage);
+				continue;
+			}
 			if (client.snapshotActiveSessionIds?.has(state.activeSessionId)) {
 				this.queueClientCatchup(
 					client,
@@ -6664,6 +6687,7 @@ export function detachClientFromActiveSession(client: DaemonSocketClient, state:
 	state.clients.delete(client);
 	client.attachedActiveSessionIds.delete(state.activeSessionId);
 	removeDaemonClientSessionCapabilities(client, state.activeSessionId);
+	cancelPendingExtensionCustomUiRequestsForClient(state, client.id);
 	if (state.clients.size === 0) {
 		cancelPendingExtensionUiRequests(state);
 	}
@@ -6748,6 +6772,17 @@ export function cancelPendingExtensionUiRequests(state: ActiveSessionState): voi
 	for (const pending of pendingRequests) {
 		pending.resolve({ cancelled: true });
 	}
+	for (const pending of [...(state.extensionCustomUiRequests?.values() ?? [])]) {
+		pending.cancel();
+	}
+}
+
+export function cancelPendingExtensionCustomUiRequestsForClient(state: ActiveSessionState, clientId: string): void {
+	for (const pending of [...(state.extensionCustomUiRequests?.values() ?? [])]) {
+		if (pending.ownerClientId === clientId) {
+			pending.cancel();
+		}
+	}
 }
 
 function normalizeClientCapabilities(
@@ -6793,6 +6828,16 @@ function isSequencedSessionOutbound(message: DaemonOutbound): message is Sequenc
 }
 
 export function shouldSendDaemonOutboundToClient(client: DaemonSocketClient, message: DaemonOutbound): boolean {
+	if (
+		message.type === "extension_custom_ui_open" ||
+		message.type === "extension_custom_ui_frame" ||
+		message.type === "extension_custom_ui_close"
+	) {
+		return (
+			message.targetClientId === client.id &&
+			daemonClientCapabilitiesForSession(client, message.activeSessionId).has("extension_custom_ui")
+		);
+	}
 	return (
 		message.type !== "extension_ui_request" ||
 		!isDaemonDialogExtensionUiRequest(message.method) ||

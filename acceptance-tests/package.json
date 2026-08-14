@@ -1,0 +1,16 @@
+{
+  "name": "prime-agent-acceptance-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "OPENSPEC_DIR=/Users/codaveto/Workspace/openspec/pew cucumber-js",
+    "test:specs": "OPENSPEC_DIR=/Users/codaveto/Workspace/openspec/pew cucumber-js -p specs",
+    "lint:specs": "node extract-gherkin.cjs /Users/codaveto/Workspace/openspec/pew .extracted && gherkin-lint .extracted"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^12.2.0",
+    "cheerio": "^1.1.2",
+    "gherkin-lint": "^4.2.4",
+    "glob": "^11.1.0"
+  }
+}

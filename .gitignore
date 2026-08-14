@@ -43,3 +43,5 @@ collect.sh
 
 __pycache__/
 *.pyc
+acceptance-tests/.extracted/
+acceptance-tests/reports/

@@ -143,6 +143,7 @@ import { ensureTool, ensureToolWithStatus, formatMissingRipgrepMessage } from ".
 import { checkForNewPiVersion } from "../../utils/version-check.js";
 import type {
 	AgentConnection,
+	AgentConnectionExtensionCustomUiPresentation,
 	AgentConnectionExtensionUiRequest,
 	AgentConnectionExtensionUiResponse,
 	AgentConnectionHeartbeat,
@@ -247,6 +248,7 @@ import {
 } from "./onboarding.js";
 import type { ClientPromptStashStore, PromptStash, PromptStashState } from "./prompt-stash-state.js";
 import { QueueSelection } from "./queue-selection.js";
+import { RemoteExtensionCustomUiComponent } from "./remote-extension-custom-ui.js";
 import { formatResumeHint } from "./resume-hint.js";
 import {
 	getAvailableThemes,
@@ -1025,6 +1027,22 @@ export class InteractiveMode {
 	private extensionEditor: ExtensionEditorComponent | undefined = undefined;
 	private extensionTerminalInputUnsubscribers = new Set<() => void>();
 	private activeConnectionExtensionUiRequests = new Map<string, { cancelLocal: () => void }>();
+	private activeConnectionExtensionCustomUiRequests = new Map<
+		string,
+		{
+			component: RemoteExtensionCustomUiComponent;
+			presentation: AgentConnectionExtensionCustomUiPresentation;
+			overlayHandle?: OverlayHandle;
+			savedEditorText: string;
+			ready: boolean;
+			columns?: number;
+			rows?: number;
+			width?: number;
+			hidden: boolean;
+			terminalInputUnsubscribe?: () => void;
+			terminalInputChain: Promise<void>;
+		}
+	>();
 
 	// Extension widgets (components rendered above/below the editor)
 	private extensionWidgetsAbove = new Map<string, Component & { dispose?(): void }>();
@@ -3536,6 +3554,7 @@ export class InteractiveMode {
 
 	private resetExtensionUI(): void {
 		this.cancelActiveConnectionExtensionUiRequests();
+		this.cancelActiveConnectionExtensionCustomUiRequests();
 		this.closeHeartbeatManager();
 		if (this.extensionSelector) {
 			this.hideExtensionSelector();
@@ -5131,6 +5150,18 @@ export class InteractiveMode {
 					this.handleSideQuestionEvent(event.event);
 				} else if (event.type === "extension_ui_request") {
 					await this.handleConnectionExtensionUiRequest(event.request);
+				} else if (event.type === "extension_custom_ui_open") {
+					this.openConnectionExtensionCustomUi(event.id, event.presentation);
+				} else if (event.type === "extension_custom_ui_frame") {
+					this.updateConnectionExtensionCustomUi(
+						event.id,
+						event.lines,
+						event.hidden,
+						event.focused,
+						event.presentation,
+					);
+				} else if (event.type === "extension_custom_ui_close") {
+					this.closeConnectionExtensionCustomUi(event.id, event.error);
 				} else if (event.type === "connection_status") {
 					this.showStatus(
 						event.status === "connected" ? "Daemon reconnected" : "Daemon connection lost; reconnecting…",
@@ -5148,6 +5179,150 @@ export class InteractiveMode {
 				this.showError(error instanceof Error ? error.message : String(error));
 			}
 		});
+	}
+
+	private openConnectionExtensionCustomUi(
+		id: string,
+		presentation: AgentConnectionExtensionCustomUiPresentation,
+	): void {
+		this.closeConnectionExtensionCustomUi(id);
+		const savedEditorText = this.editor.getText();
+		const active = {
+			component: undefined as unknown as RemoteExtensionCustomUiComponent,
+			presentation,
+			savedEditorText,
+			ready: false,
+			columns: undefined as number | undefined,
+			rows: undefined as number | undefined,
+			width: undefined as number | undefined,
+			overlayHandle: undefined as OverlayHandle | undefined,
+			hidden: false,
+			terminalInputUnsubscribe: undefined as (() => void) | undefined,
+			terminalInputChain: Promise.resolve(),
+		};
+		const sendDimensions = (width: number) => {
+			const columns = this.ui.terminal.columns;
+			const rows = this.ui.terminal.rows;
+			if (active.columns === columns && active.rows === rows && active.width === width) return;
+			active.columns = columns;
+			active.rows = rows;
+			active.width = width;
+			const event = active.ready
+				? ({ type: "resize", columns, rows, width } as const)
+				: ({ type: "ready", columns, rows, width } as const);
+			active.ready = true;
+			void this.agentConnection.sendExtensionCustomUiEvent(id, event).catch((error) => {
+				this.showError(error instanceof Error ? error.message : String(error));
+			});
+		};
+		active.component = new RemoteExtensionCustomUiComponent((data) => {
+			const columns = this.ui.terminal.columns;
+			const rows = this.ui.terminal.rows;
+			const width = active.width ?? columns;
+			void this.agentConnection
+				.sendExtensionCustomUiEvent(id, { type: "input", data, columns, rows, width })
+				.catch((error) => this.showError(error instanceof Error ? error.message : String(error)));
+		}, sendDimensions);
+		this.activeConnectionExtensionCustomUiRequests.set(id, active);
+		if (presentation.overlay) {
+			active.overlayHandle = this.ui.showOverlay(
+				active.component,
+				presentation.overlayOptions as OverlayOptions | undefined,
+			);
+		} else {
+			this.editorContainer.clear();
+			this.editorContainer.addChild(active.component);
+			this.ui.setFocus(active.component);
+			this.ui.requestRender();
+		}
+	}
+
+	private updateConnectionExtensionCustomUi(
+		id: string,
+		lines: string[],
+		hidden: boolean,
+		focused: boolean,
+		presentation: AgentConnectionExtensionCustomUiPresentation,
+	): void {
+		const active = this.activeConnectionExtensionCustomUiRequests.get(id);
+		if (!active) return;
+		active.presentation = presentation;
+		active.component.setLines(lines);
+		active.hidden = hidden;
+		this.syncConnectionExtensionCustomUiTerminalInput(id, active);
+		if (active.overlayHandle) {
+			active.overlayHandle.setHidden(hidden);
+			if (!hidden && focused) active.overlayHandle.focus();
+			else if (!focused) active.overlayHandle.unfocus();
+		}
+		this.ui.requestRender();
+	}
+
+	private syncConnectionExtensionCustomUiTerminalInput(
+		id: string,
+		active: {
+			hidden: boolean;
+			columns?: number;
+			rows?: number;
+			width?: number;
+			terminalInputUnsubscribe?: () => void;
+			terminalInputChain: Promise<void>;
+		},
+	): void {
+		if (!active.hidden) {
+			active.terminalInputUnsubscribe?.();
+			active.terminalInputUnsubscribe = undefined;
+			return;
+		}
+		if (active.terminalInputUnsubscribe) return;
+		active.terminalInputUnsubscribe = this.ui.addInputListener((data) => {
+			active.terminalInputChain = active.terminalInputChain
+				.then(async () => {
+					const columns = this.ui.terminal.columns;
+					const rows = this.ui.terminal.rows;
+					const width = active.width ?? columns;
+					const result = await this.agentConnection.sendExtensionCustomUiEvent(id, {
+						type: "terminal_input",
+						data,
+						columns,
+						rows,
+						width,
+					});
+					if (!result?.consume) {
+						const replay = result?.data ?? data;
+						if (replay.length > 0) {
+							this.editor.handleInput?.(replay);
+							this.ui.requestRender();
+						}
+					}
+				})
+				.catch((error) => this.showError(error instanceof Error ? error.message : String(error)));
+			return { consume: true };
+		});
+	}
+
+	private closeConnectionExtensionCustomUi(id: string, error?: string): void {
+		const active = this.activeConnectionExtensionCustomUiRequests.get(id);
+		if (!active) return;
+		this.activeConnectionExtensionCustomUiRequests.delete(id);
+		active.terminalInputUnsubscribe?.();
+		if (active.overlayHandle) {
+			active.overlayHandle.hide();
+		} else {
+			this.editorContainer.clear();
+			this.editorContainer.addChild(this.editor);
+			this.editor.setText(active.savedEditorText);
+			this.ui.setFocus(this.editor);
+			this.ui.requestRender();
+		}
+		if (error) this.showError(error);
+	}
+
+	private cancelActiveConnectionExtensionCustomUiRequests(): void {
+		for (const id of [...this.activeConnectionExtensionCustomUiRequests.keys()]) {
+			void this.agentConnection.sendExtensionCustomUiEvent(id, { type: "cancel" }).catch(() => {});
+			this.closeConnectionExtensionCustomUi(id);
+		}
 	}
 
 	private async handleConnectionExtensionUiRequest(request: AgentConnectionExtensionUiRequest): Promise<void> {

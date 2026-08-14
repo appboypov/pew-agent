@@ -352,6 +352,7 @@ class FakeDaemonClient {
 			case "set_scoped_models":
 			case "rename_saved_session":
 			case "extension_ui_response":
+			case "extension_custom_ui_event":
 			case "detach":
 				return { type: "response", command: command.type, success: true };
 			case "cancel_rlm_child":
@@ -2006,7 +2007,14 @@ describe("DaemonAgentConnection", () => {
 		expect(fakeClient.requests.at(-1)).toMatchObject({
 			type: "attach",
 			activeSessionId: "active-1",
-			capabilities: ["attach_snapshot", "event_sequence", "extension_ui", "slim_attach", "chunked_snapshot"],
+			capabilities: [
+				"attach_snapshot",
+				"event_sequence",
+				"extension_ui",
+				"extension_custom_ui",
+				"slim_attach",
+				"chunked_snapshot",
+			],
 			resumeCursor: {
 				activeSessionId: "active-1",
 				generation: "generation-active-1",
@@ -2501,7 +2509,14 @@ describe("DaemonAgentConnection", () => {
 			type: "attach",
 			activeSessionId: "active-1",
 			clientId: expect.any(String),
-			capabilities: ["attach_snapshot", "event_sequence", "extension_ui", "slim_attach", "chunked_snapshot"],
+			capabilities: [
+				"attach_snapshot",
+				"event_sequence",
+				"extension_ui",
+				"extension_custom_ui",
+				"slim_attach",
+				"chunked_snapshot",
+			],
 			resumeCursor: {
 				activeSessionId: "active-1",
 				generation: "generation-active-1",
@@ -2513,7 +2528,14 @@ describe("DaemonAgentConnection", () => {
 		expect(fakeClient.requests.at(-1)).toMatchObject({
 			type: "attach",
 			activeSessionId: "active-1",
-			capabilities: ["attach_snapshot", "event_sequence", "extension_ui", "slim_attach", "chunked_snapshot"],
+			capabilities: [
+				"attach_snapshot",
+				"event_sequence",
+				"extension_ui",
+				"extension_custom_ui",
+				"slim_attach",
+				"chunked_snapshot",
+			],
 			resumeCursor: {
 				activeSessionId: "active-1",
 				generation: "generation-active-1",
@@ -2572,7 +2594,14 @@ describe("DaemonAgentConnection", () => {
 			activeSessionId: "active-1",
 			supportsExtensionUi: true,
 			clientId: expect.any(String),
-			capabilities: ["attach_snapshot", "event_sequence", "extension_ui", "slim_attach", "chunked_snapshot"],
+			capabilities: [
+				"attach_snapshot",
+				"event_sequence",
+				"extension_ui",
+				"extension_custom_ui",
+				"slim_attach",
+				"chunked_snapshot",
+			],
 		});
 
 		fakeClient.emitMessage({
@@ -2607,6 +2636,62 @@ describe("DaemonAgentConnection", () => {
 			activeSessionId: "active-1",
 			requestId: "request-1",
 			response: { confirmed: true },
+		});
+
+		fakeClient.serverCapabilities.add("extension_custom_ui");
+		fakeClient.emitMessage({
+			type: "extension_custom_ui_open",
+			activeSessionId: "active-1",
+			targetClientId: "fake-client",
+			id: "custom-1",
+			presentation: { overlay: true, overlayOptions: { width: "80%" } },
+		});
+		fakeClient.emitMessage({
+			type: "extension_custom_ui_frame",
+			activeSessionId: "active-1",
+			targetClientId: "fake-client",
+			id: "custom-1",
+			lines: ["custom frame"],
+			hidden: false,
+			focused: true,
+			presentation: { overlay: true, overlayOptions: { width: "80%" } },
+		});
+		fakeClient.emitMessage({
+			type: "extension_custom_ui_close",
+			activeSessionId: "active-1",
+			targetClientId: "fake-client",
+			id: "custom-1",
+		});
+		await vi.waitFor(() =>
+			expect(events.slice(-3)).toEqual([
+				{
+					type: "extension_custom_ui_open",
+					id: "custom-1",
+					presentation: { overlay: true, overlayOptions: { width: "80%" } },
+				},
+				{
+					type: "extension_custom_ui_frame",
+					id: "custom-1",
+					lines: ["custom frame"],
+					hidden: false,
+					focused: true,
+					presentation: { overlay: true, overlayOptions: { width: "80%" } },
+				},
+				{ type: "extension_custom_ui_close", id: "custom-1", error: undefined },
+			]),
+		);
+		await connection.sendExtensionCustomUiEvent("custom-1", {
+			type: "input",
+			data: "x",
+			columns: 80,
+			rows: 24,
+			width: 80,
+		});
+		expect(fakeClient.requests.at(-1)).toMatchObject({
+			type: "extension_custom_ui_event",
+			activeSessionId: "active-1",
+			requestId: "custom-1",
+			event: { type: "input", data: "x", columns: 80, rows: 24 },
 		});
 	});
 

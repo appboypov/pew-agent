@@ -537,6 +537,48 @@ export interface AgentConnectionExtensionUiRequest {
 	payload: Record<string, unknown>;
 }
 
+export interface AgentConnectionExtensionCustomUiOverlayOptions {
+	width?: number | `${number}%`;
+	minWidth?: number;
+	maxHeight?: number | `${number}%`;
+	scrollback?: boolean;
+	anchor?:
+		| "center"
+		| "top-left"
+		| "top-right"
+		| "bottom-left"
+		| "bottom-right"
+		| "top-center"
+		| "bottom-center"
+		| "left-center"
+		| "right-center";
+	offsetX?: number;
+	offsetY?: number;
+	row?: number | `${number}%`;
+	col?: number | `${number}%`;
+	aboveMarker?: string;
+	margin?: number | { top?: number; right?: number; bottom?: number; left?: number };
+	nonCapturing?: boolean;
+	suspendFullscreenMouse?: boolean;
+}
+
+export interface AgentConnectionExtensionCustomUiPresentation {
+	overlay: boolean;
+	overlayOptions?: AgentConnectionExtensionCustomUiOverlayOptions;
+}
+
+export interface AgentConnectionExtensionCustomUiInputResult {
+	consume?: boolean;
+	data?: string;
+}
+
+export type AgentConnectionExtensionCustomUiEvent =
+	| { type: "ready"; columns: number; rows: number; width: number }
+	| { type: "input"; data: string; columns: number; rows: number; width: number }
+	| { type: "terminal_input"; data: string; columns: number; rows: number; width: number }
+	| { type: "resize"; columns: number; rows: number; width: number }
+	| { type: "cancel" };
+
 export type AgentConnectionRlmChildAgentStatus = "queued" | "running" | "done" | "error" | "cancelled";
 
 export interface AgentConnectionRlmChildAgentActivity {
@@ -624,6 +666,20 @@ export type AgentConnectionEvent =
 	| { type: "session_resynced"; snapshot: AgentConnectionSnapshot }
 	| { type: "session_status"; recap?: string }
 	| { type: "extension_ui_request"; request: AgentConnectionExtensionUiRequest }
+	| {
+			type: "extension_custom_ui_open";
+			id: string;
+			presentation: AgentConnectionExtensionCustomUiPresentation;
+	  }
+	| {
+			type: "extension_custom_ui_frame";
+			id: string;
+			lines: string[];
+			hidden: boolean;
+			focused: boolean;
+			presentation: AgentConnectionExtensionCustomUiPresentation;
+	  }
+	| { type: "extension_custom_ui_close"; id: string; error?: string }
 	| { type: "extension_error"; extensionPath: string; event: string; error: string }
 	| { type: "connection_status"; status: "reconnecting" | "connected"; error?: string }
 	| { type: "heartbeats_changed" }
@@ -689,6 +745,10 @@ export interface AgentConnection {
 	getToolDefinition(name: string): Promise<AgentConnectionToolDefinition | undefined>;
 	setSessionEntryLabel(entryId: string, label: string | undefined): Promise<void>;
 	respondToExtensionUiRequest(requestId: string, response: AgentConnectionExtensionUiResponse): Promise<void>;
+	sendExtensionCustomUiEvent(
+		requestId: string,
+		event: AgentConnectionExtensionCustomUiEvent,
+	): Promise<AgentConnectionExtensionCustomUiInputResult | undefined>;
 
 	prompt(message: string, options?: AgentConnectionPromptOptions): Promise<void>;
 	promptAndWait(message: string, options?: AgentConnectionPromptOptions): Promise<void>;

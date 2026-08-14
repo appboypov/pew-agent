@@ -24,6 +24,8 @@ import type { SessionCwdIssue } from "../../core/session-cwd.js";
 import type { DeleteSessionFileResult } from "../../core/session-file-actions.js";
 import type {
 	AgentConnectionAgentStatus,
+	AgentConnectionExtensionCustomUiEvent,
+	AgentConnectionExtensionCustomUiPresentation,
 	AgentConnectionHeartbeat,
 	AgentConnectionQueueMode,
 	AgentConnectionResourceSnapshot,
@@ -61,8 +63,9 @@ export const DAEMON_COMMAND_ENVELOPE_MIN_PROTOCOL_VERSION = 7;
 // Revision 14 carries the client's monotonic telemetry opt-out on attach and reattach.
 // Revision 15 adds the mutate_queued_message command and queue_message_mutation capability.
 // Revision 16 adds the "stopping" workerState and stops reporting disconnected workers as "ready".
-export const DAEMON_SCHEMA_REVISION = 16;
-export const DAEMON_SCHEMA_ID = "protocol-7-schema-16-1bcb9e7f1a49";
+// Revision 17 transports worker-owned Pi custom components to capable interactive clients.
+export const DAEMON_SCHEMA_REVISION = 17;
+export const DAEMON_SCHEMA_ID = "protocol-7-schema-17-9f4bffce07e0";
 
 export type DaemonProtocolName = typeof DAEMON_PROTOCOL_NAME;
 export type DaemonProtocolVersion = number;
@@ -78,6 +81,7 @@ export type DaemonClientCapability =
 	| "attach_snapshot"
 	| "event_sequence"
 	| "extension_ui"
+	| "extension_custom_ui"
 	| "slim_attach"
 	| "chunked_snapshot"
 	| "client_owned_sessions";
@@ -124,6 +128,7 @@ export const DAEMON_SUPPORTED_CLIENT_CAPABILITIES: readonly DaemonClientCapabili
 	"attach_snapshot",
 	"event_sequence",
 	"extension_ui",
+	"extension_custom_ui",
 	"slim_attach",
 	"chunked_snapshot",
 	"client_owned_sessions",
@@ -614,6 +619,13 @@ export type DaemonCommand =
 			requestId: string;
 			response: DaemonExtensionUIResponse;
 	  }
+	| {
+			id?: string;
+			type: "extension_custom_ui_event";
+			activeSessionId: string;
+			requestId: string;
+			event: AgentConnectionExtensionCustomUiEvent;
+	  }
 	| { id?: string; type: "ack_result"; commandId: string }
 	| { id?: string; type: "prepare_update_restart" }
 	| { id?: string; type: "retry_worker"; activeSessionId: string }
@@ -631,6 +643,11 @@ export interface DaemonCommandCompatibility {
 const LEGACY_DAEMON_COMMAND = { minProtocol: 7 } as const;
 const CURRENT_DAEMON_COMMAND = { minProtocol: 7 } as const;
 const RLM_MAX_DEPTH_COMMAND = { minProtocol: 7, minSchemaRevision: 11 } as const;
+const EXTENSION_CUSTOM_UI_COMMAND = {
+	minProtocol: 7,
+	minSchemaRevision: 17,
+	capability: "extension_custom_ui",
+} as const;
 const SESSION_INPUT_ADMISSION_COMMAND = {
 	minProtocol: 7,
 	capability: "session_input_admission",
@@ -746,6 +763,7 @@ export const DAEMON_COMMAND_COMPATIBILITY = {
 	get_tool_definition: LEGACY_DAEMON_COMMAND,
 	set_session_entry_label: LEGACY_DAEMON_COMMAND,
 	extension_ui_response: LEGACY_DAEMON_COMMAND,
+	extension_custom_ui_event: EXTENSION_CUSTOM_UI_COMMAND,
 	prepare_update_restart: LEGACY_DAEMON_COMMAND,
 	retry_worker: LEGACY_DAEMON_COMMAND,
 	restart: LEGACY_DAEMON_COMMAND,
@@ -940,6 +958,33 @@ export type DaemonOutbound =
 			meta?: DaemonEventMeta;
 	  }
 	| {
+			type: "extension_custom_ui_open";
+			activeSessionId: string;
+			targetClientId: string;
+			id: string;
+			presentation: AgentConnectionExtensionCustomUiPresentation;
+			meta?: DaemonEventMeta;
+	  }
+	| {
+			type: "extension_custom_ui_frame";
+			activeSessionId: string;
+			targetClientId: string;
+			id: string;
+			lines: string[];
+			hidden: boolean;
+			focused: boolean;
+			presentation: AgentConnectionExtensionCustomUiPresentation;
+			meta?: DaemonEventMeta;
+	  }
+	| {
+			type: "extension_custom_ui_close";
+			activeSessionId: string;
+			targetClientId: string;
+			id: string;
+			error?: string;
+			meta?: DaemonEventMeta;
+	  }
+	| {
 			type: "extension_error";
 			activeSessionId: string;
 			extensionPath: string;
@@ -968,6 +1013,9 @@ export const DAEMON_OUTBOUND_COMPATIBILITY = {
 	session_detached: LEGACY_DAEMON_COMMAND,
 	session_closed: LEGACY_DAEMON_COMMAND,
 	extension_ui_request: LEGACY_DAEMON_COMMAND,
+	extension_custom_ui_open: EXTENSION_CUSTOM_UI_COMMAND,
+	extension_custom_ui_frame: EXTENSION_CUSTOM_UI_COMMAND,
+	extension_custom_ui_close: EXTENSION_CUSTOM_UI_COMMAND,
 	extension_error: LEGACY_DAEMON_COMMAND,
 } as const satisfies Record<DaemonOutbound["type"], DaemonCommandCompatibility>;
 
@@ -1066,6 +1114,7 @@ export function isDaemonMutatingCommand(command: Pick<DaemonCommand, "type">): b
 
 export const UPDATE_RESTART_DRAIN_COMMANDS: ReadonlySet<DaemonCommand["type"]> = new Set([
 	"extension_ui_response",
+	"extension_custom_ui_event",
 	"abort",
 	"abort_bash",
 	"abort_branch_summary",
